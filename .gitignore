@@ -1,0 +1,28 @@
+# Google API Credentials (keep private!)
+credentials.json
+token.json
+
+# PowerPoint and presentation files
+*.pptx
+*.ppt
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment files
+.env
+.venv
+venv/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db 
+images
