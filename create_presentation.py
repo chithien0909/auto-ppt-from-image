@@ -7,6 +7,7 @@ from pathlib import Path
 from pptx import Presentation
 from pptx.util import Inches
 from PIL import Image
+import time
 
 def natural_sort_key(filename):
     """
@@ -17,6 +18,25 @@ def natural_sort_key(filename):
         return int(text) if text.isdigit() else text.lower()
     
     return [convert(c) for c in re.split('([0-9]+)', filename)]
+
+def show_progress(current, total, prefix='', suffix='', length=50, fill='█'):
+    """
+    Display a progress bar in the console.
+    
+    Args:
+        current (int): Current progress value
+        total (int): Total value
+        prefix (str): Prefix string
+        suffix (str): Suffix string
+        length (int): Length of the progress bar
+        fill (str): Character to fill the progress bar
+    """
+    percent = f"{100 * (current / float(total)):.1f}"
+    filled_length = int(length * current // total)
+    bar = fill * filled_length + '-' * (length - filled_length)
+    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end='\r')
+    if current == total:
+        print()
 
 def create_presentation_from_images(images_folder="images", output_file="presentation.pptx", slide_format="4:3", fit_mode="contain"):
     """
@@ -31,6 +51,8 @@ def create_presentation_from_images(images_folder="images", output_file="present
             - "contain": Entire image fits within slide (may have margins)
             - "stretch": Image stretches to fill slide (may distort)
     """
+    start_time = time.time()
+    
     # Create a new presentation with the specified aspect ratio
     if slide_format == "4:3":
         prs = Presentation()  # Default is 4:3
@@ -48,6 +70,7 @@ def create_presentation_from_images(images_folder="images", output_file="present
     image_extensions = ['*.png', '*.jpg', '*.jpeg', '*.gif', '*.bmp', '*.tiff']
     image_files = []
     
+    print("\nScanning for images...")
     for extension in image_extensions:
         image_files.extend(glob.glob(os.path.join(images_folder, extension)))
         image_files.extend(glob.glob(os.path.join(images_folder, extension.upper())))
@@ -58,14 +81,16 @@ def create_presentation_from_images(images_folder="images", output_file="present
         print(f"No image files found in {images_folder} folder.")
         return
     
-    print(f"Found {len(image_files)} image(s). Creating presentation in {slide_format} format with '{fit_mode}' fitting...")
-    print("Processing order:")
+    total_images = len(image_files)
+    print(f"\nFound {total_images} image(s). Creating presentation in {slide_format} format with '{fit_mode}' fitting...")
+    print("\nProcessing order:")
     for i, img_file in enumerate(image_files):
         print(f"  {i+1}. {os.path.basename(img_file)}")
     print()
     
+    print("Creating slides...")
     for i, image_file in enumerate(image_files):
-        print(f"Processing slide {i+1}: {os.path.basename(image_file)} - {fit_mode.upper()} FIT")
+        show_progress(i + 1, total_images, prefix='Progress:', suffix=f'Slide {i+1}/{total_images}')
         
         slide_layout = prs.slide_layouts[6]  # Blank layout
         slide = prs.slides.add_slide(slide_layout)
@@ -81,9 +106,6 @@ def create_presentation_from_images(images_folder="images", output_file="present
             slide_ratio = slide_width / slide_height
             img_ratio = img_width / img_height
             
-            print(f"  Image dimensions: {img_width}x{img_height}, ratio: {img_ratio:.2f}")
-            print(f"  Slide dimensions: {slide_width/Inches(1):.2f}\"x{slide_height/Inches(1):.2f}\", ratio: {slide_ratio:.2f}")
-            
             if fit_mode == "contain":
                 # Fit entire image within slide (no cropping)
                 if img_ratio > slide_ratio:
@@ -93,7 +115,6 @@ def create_presentation_from_images(images_folder="images", output_file="present
                     final_height = int(img_height * scale_factor)
                     left = 0
                     top = (slide_height - final_height) // 2
-                    print(f"  Image is wider than slide, scaling to fit width and centering vertically")
                 else:
                     # Image is taller, scale by height
                     scale_factor = slide_height / img_height
@@ -101,7 +122,6 @@ def create_presentation_from_images(images_folder="images", output_file="present
                     final_width = int(img_width * scale_factor)
                     left = (slide_width - final_width) // 2
                     top = 0
-                    print(f"  Image is taller than slide, scaling to fit height and centering horizontally")
             
             elif fit_mode == "cover":
                 # Cover entire slide (may crop image)
@@ -112,7 +132,6 @@ def create_presentation_from_images(images_folder="images", output_file="present
                     final_width = int(img_width * scale_factor)
                     left = (slide_width - final_width) // 2
                     top = 0
-                    print(f"  Image is wider than slide, centering horizontally and scaling to full height")
                 else:
                     # Image is taller, scale by width
                     scale_factor = slide_width / img_width
@@ -120,7 +139,6 @@ def create_presentation_from_images(images_folder="images", output_file="present
                     final_height = int(img_height * scale_factor)
                     left = 0
                     top = (slide_height - final_height) // 2
-                    print(f"  Image is taller than slide, centering vertically and scaling to full width")
             
             elif fit_mode == "stretch":
                 # Stretch to fill slide (may distort image)
@@ -128,7 +146,6 @@ def create_presentation_from_images(images_folder="images", output_file="present
                 final_height = slide_height
                 left = 0
                 top = 0
-                print(f"  Stretching image to fill entire slide")
             
             picture = slide.shapes.add_picture(
                 image_file,
@@ -138,19 +155,22 @@ def create_presentation_from_images(images_folder="images", output_file="present
                 height=final_height
             )
             
-            print(f"  Final image size: {final_width/Inches(1):.2f}\"x{final_height/Inches(1):.2f}\" at position ({left/Inches(1):.2f}\", {top/Inches(1):.2f}\")")
-            
         except Exception as e:
-            print(f"Error adding image {image_file}: {str(e)}")
+            print(f"\nError adding image {image_file}: {str(e)}")
             continue
     
+    print("\nSaving presentation...")
     try:
         prs.save(output_file)
-        print(f"Presentation saved successfully as '{output_file}'")
+        end_time = time.time()
+        duration = end_time - start_time
+        
+        print(f"\nPresentation saved successfully as '{output_file}'")
         print(f"Created {len(prs.slides)} slides from {len(image_files)} images in {slide_format} format")
         print(f"Images fitted using '{fit_mode}' mode")
+        print(f"Total processing time: {duration:.1f} seconds")
     except Exception as e:
-        print(f"Error saving presentation: {str(e)}")
+        print(f"\nError saving presentation: {str(e)}")
 
 def main():
     """Main function to run the script"""

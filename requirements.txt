@@ -1,3 +1,4 @@
 python-pptx>=0.6.21
 Pillow>=9.0.0
-reportlab>=3.6.0 
+reportlab>=3.6.8
+PyPDF2>=3.0.0 

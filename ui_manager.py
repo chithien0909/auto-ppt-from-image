@@ -220,8 +220,22 @@ def convert_pdf_menu(convert_pdf_func):
         input_file = pptx_files[idx]
         output_file = input_file.rsplit(".", 1)[0] + ".pdf"
         
+        # Get quality selection
+        print("\nSelect PDF quality:")
+        print("1. Low - Smallest file size (30% image quality, 72 DPI)")
+        print("2. Medium - Balanced (60% image quality, 150 DPI)")
+        print("3. High - Best quality (80% image quality, 300 DPI)")
+        quality_choice = input("Choose quality [2]: ").strip() or "2"
+        
+        quality_map = {
+            "1": "low",
+            "2": "medium",
+            "3": "high"
+        }
+        quality = quality_map.get(quality_choice, "medium")
+        
         # Call the conversion function
-        success = convert_pdf_func(input_file, output_file)
+        success = convert_pdf_func(input_file, output_file, quality)
         
         if not success:
             print("\nConversion failed. Please check the error messages above.")

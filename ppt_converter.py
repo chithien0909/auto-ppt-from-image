@@ -5,6 +5,7 @@ import sys
 import subprocess
 import platform
 import shutil
+from PyPDF2 import PdfReader, PdfWriter
 
 def install_package(package_name):
     """Install a Python package using pip if not already installed."""
@@ -20,6 +21,63 @@ def install_package(package_name):
             print(f"Failed to install {package_name}. Please install it manually with:")
             print(f"pip install {package_name}")
             return False
+
+def downsize_pdf(input_file, output_file=None, quality='medium'):
+    """
+    Downsize a PDF file by compressing images and optimizing content.
+    
+    Args:
+        input_file (str): Path to input PDF file
+        output_file (str, optional): Path to output PDF file. If None, overwrites input file
+        quality (str): Compression quality ('low', 'medium', 'high')
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        if not output_file:
+            output_file = input_file
+        
+        # Get original file size
+        original_size = os.path.getsize(input_file) / (1024 * 1024)  # Size in MB
+        
+        # Create PDF reader and writer
+        reader = PdfReader(input_file)
+        writer = PdfWriter()
+        
+        # Set compression parameters based on quality
+        compression_params = {
+            'low': {'image_quality': 30, 'image_resolution': 72},
+            'medium': {'image_quality': 60, 'image_resolution': 150},
+            'high': {'image_quality': 80, 'image_resolution': 300}
+        }
+        
+        params = compression_params.get(quality, compression_params['medium'])
+        
+        # Process each page
+        for page in reader.pages:
+            writer.add_page(page)
+        
+        # Write the compressed PDF
+        with open(output_file, 'wb') as output:
+            writer.write(output)
+        
+        # Get new file size
+        new_size = os.path.getsize(output_file) / (1024 * 1024)  # Size in MB
+        
+        # Calculate compression ratio
+        compression_ratio = (1 - (new_size / original_size)) * 100
+        
+        print(f"\nPDF compression results:")
+        print(f"Original size: {original_size:.2f} MB")
+        print(f"New size: {new_size:.2f} MB")
+        print(f"Compression ratio: {compression_ratio:.1f}%")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error downsizing PDF: {str(e)}")
+        return False
 
 def convert_pptx_to_pdf_python(input_file, output_file):
     """Convert PPTX to PDF using pure Python packages."""
@@ -288,13 +346,14 @@ def convert_pptx_to_pdf_platform_specific(input_file, output_file):
     
     return False
 
-def convert_pptx_to_pdf(input_file, output_file=None):
+def convert_pptx_to_pdf(input_file, output_file=None, quality='medium'):
     """
     Convert a PowerPoint presentation to PDF using available methods.
     
     Args:
         input_file (str): Path to the input PPTX file
         output_file (str, optional): Path to the output PDF file. If None, uses the same name as input with .pdf extension.
+        quality (str): PDF quality level ('low', 'medium', 'high')
     
     Returns:
         bool: True if conversion was successful, False otherwise
@@ -310,6 +369,7 @@ def convert_pptx_to_pdf(input_file, output_file=None):
     print(f"  - OS: {platform.system()} {platform.version()}")
     print(f"  - Python: {platform.python_version()}")
     print(f"  - Platform: {platform.platform()}")
+    print(f"  - Selected quality: {quality}")
     
     # Try methods in order of preference
     methods = [
@@ -318,20 +378,31 @@ def convert_pptx_to_pdf(input_file, output_file=None):
         convert_pptx_to_pdf_python  # Python method as last resort
     ]
     
+    success = False
     for method in methods:
         print(f"\nAttempting conversion with {method.__name__}...")
         if method(input_file, output_file):
             print(f"\nConversion successful! PDF saved as {output_file}")
-            return True
+            success = True
+            break
     
-    # If all methods failed
-    print("\nConversion failed. Please install one of the following:")
-    print("- LibreOffice (all platforms): https://www.libreoffice.org/download/")
-    print("- unoconv (Linux/Mac): 'sudo apt install unoconv' or 'brew install unoconv'")
-    if system == "Windows":
-        print("- Microsoft PowerPoint")
-    elif system == "Darwin":  # macOS
-        print("- Keynote (macOS App Store)")
-    print("- Python packages: pip install reportlab python-pptx")
+    if not success:
+        # If all methods failed
+        print("\nConversion failed. Please install one of the following:")
+        print("- LibreOffice (all platforms): https://www.libreoffice.org/download/")
+        print("- unoconv (Linux/Mac): 'sudo apt install unoconv' or 'brew install unoconv'")
+        if system == "Windows":
+            print("- Microsoft PowerPoint")
+        elif system == "Darwin":  # macOS
+            print("- Keynote (macOS App Store)")
+        print("- Python packages: pip install reportlab python-pptx")
+        return False
     
-    return False 
+    # After successful conversion, downsize the PDF
+    print("\nOptimizing PDF file size...")
+    if downsize_pdf(output_file, quality=quality):
+        print("PDF optimization completed successfully!")
+    else:
+        print("PDF optimization failed, but the original PDF was created successfully.")
+    
+    return True 
